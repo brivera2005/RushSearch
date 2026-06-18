@@ -8,12 +8,18 @@
 </head>
 <body>
   <div class="panel" id="panel">
+    <div class="drag-bar" title="Drag to move">
+      <span class="drag-grip" aria-hidden="true">⋮⋮</span>
+      <span class="drag-label">RushSearch</span>
+      <span id="mode-badge" class="mode-badge">Fast</span>
+      <button id="settings-btn" class="icon-btn" type="button" title="Settings">⚙</button>
+    </div>
     <div class="search-row">
       <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="7"></circle>
         <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
       </svg>
-      <input id="query" type="text" placeholder="Search every file on your PC…" autocomplete="off" spellcheck="false" />
+      <input id="query" type="text" placeholder="Search files…" autocomplete="off" spellcheck="false" />
       <span id="status" class="status"></span>
     </div>
     <ul id="results" class="results"></ul>
@@ -21,10 +27,23 @@
       <span>↑↓ navigate</span>
       <span>↵ open</span>
       <span>Shift+↵ reveal</span>
+      <span>Ctrl+C path</span>
       <span>Esc close</span>
-      <span>Right-click menu</span>
     </div>
   </div>
+
+  <div id="settings-panel" class="settings-panel hidden">
+    <label class="setting-row">
+      <input type="checkbox" id="full-index" />
+      <span>Index all files (deep scan — slower, never miss a file)</span>
+    </label>
+    <label class="setting-row">
+      <input type="checkbox" id="pin-window" />
+      <span>Pin search bar (stay open when clicking away)</span>
+    </label>
+    <button id="reindex-btn" type="button" class="action-btn">Re-index now</button>
+  </div>
+
   <div id="context-menu" class="context-menu hidden"></div>
   <script src="app.js"></script>
 </body>

@@ -5,31 +5,43 @@ Ultra-fast Windows file search. Press **Ctrl+Space** anywhere to open the floati
 ## Features
 
 - **Global hotkey** — `Ctrl+Space` opens a floating, always-on-top search overlay
-- **Fuzzy / near-match search** — finds files even when your query is approximate
-- **Full-drive indexing** — scans all accessible drives in the background
+- **Draggable** — grab the top bar to move the search window anywhere; position is remembered
+- **Fast index (default)** — indexes your profile folders (Desktop, Documents, Downloads, etc.) in seconds
+- **Full index (optional)** — deep scan of all drives when you need to find absolutely everything
+- **Fuzzy / near-match search** — typo-tolerant matching with optimized bucket lookup
 - **Windows shell actions** — Open, Open file location, Properties, Send to Desktop, Copy path, Copy, Delete
+- **Pin mode** — keep the search bar open while you click elsewhere
 - **System tray** — runs in the background; double-click tray icon to search
-- **Starts with Windows** — optional login startup enabled by default
 
 ## Install
 
-Download **RushSearch-Setup-1.0.0.exe** from [Releases](https://github.com/brivera2005/RushSearch/releases) and run the installer. A desktop shortcut and Start Menu entry are created automatically.
+Download **RushSearch-Setup-1.1.0.exe** from [Releases](https://github.com/brivera2005/RushSearch/releases).
 
 ## Use
 
-1. Launch RushSearch (or let it start with Windows)
-2. Press **Ctrl+Space**
-3. Type any part of a file or folder name
-4. **Enter** to open, **Shift+Enter** to reveal in Explorer
-5. **Right-click** any result for the full action menu
-6. **Esc** to close
+| Action | Key / gesture |
+|--------|----------------|
+| Open search | **Ctrl+Space** |
+| Move window | **Drag** the top bar |
+| Open file | **Enter** or **double-click** |
+| Reveal in Explorer | **Shift+Enter** |
+| Copy path | **Ctrl+C** (on selected result) |
+| Cycle results | **Tab** / **Shift+Tab** |
+| Settings | **⚙** button (index mode, pin, re-index) |
+| Context menu | **Right-click** a result |
+| Close | **Esc** |
+
+### Index modes
+
+- **Fast** (default) — Your user folders + shallow drive roots. Ready in seconds.
+- **Full** — Every file on every drive. Enable via ⚙ → *Index all files*. Runs in the background.
 
 ## Build from source
 
 ```bash
 npm install
 npm start          # dev
-npm run build      # produces release/RushSearch-Setup-1.0.0.exe
+npm run build      # produces release/RushSearch-Setup-x.x.x.exe
 ```
 
 ## Requirements

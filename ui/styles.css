@@ -19,14 +19,72 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 90, 45, 0.15);
   backdrop-filter: blur(18px);
+}
+
+.drag-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 4px;
+  cursor: grab;
   -webkit-app-region: drag;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.drag-bar:active {
+  cursor: grabbing;
+}
+
+.drag-grip {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+  letter-spacing: -2px;
+}
+
+.drag-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  flex: 1;
+}
+
+.mode-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 107, 53, 0.2);
+  color: #ff8f66;
+}
+
+.mode-badge.full {
+  background: rgba(123, 97, 255, 0.25);
+  color: #b8a6ff;
+}
+
+.icon-btn {
+  -webkit-app-region: no-drag;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 15px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 .search-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px 10px;
+  padding: 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   -webkit-app-region: no-drag;
 }
@@ -62,7 +120,7 @@ html, body {
   list-style: none;
   margin: 0;
   padding: 6px;
-  max-height: 380px;
+  max-height: 360px;
   overflow-y: auto;
   -webkit-app-region: no-drag;
 }
@@ -118,12 +176,63 @@ html, body {
 
 .footer {
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 10px 14px;
   padding: 8px 14px 12px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.35);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   -webkit-app-region: no-drag;
+}
+
+.settings-panel {
+  position: fixed;
+  top: 52px;
+  right: 20px;
+  width: 300px;
+  background: #1b1f2a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  padding: 12px;
+  z-index: 50;
+  -webkit-app-region: no-drag;
+}
+
+.settings-panel.hidden {
+  display: none;
+}
+
+.setting-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 10px;
+  cursor: default;
+}
+
+.setting-row input {
+  margin-top: 2px;
+  accent-color: #ff6b35;
+}
+
+.action-btn {
+  width: 100%;
+  border: 1px solid rgba(255, 107, 53, 0.35);
+  background: rgba(255, 107, 53, 0.12);
+  color: #ffb89a;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+}
+
+.action-btn:hover {
+  background: rgba(255, 107, 53, 0.22);
 }
 
 .context-menu {

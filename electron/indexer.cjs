@@ -3,6 +3,7 @@
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
+const os = require('os');
 const { EventEmitter } = require('events');
 
 const SKIP_DIRS = new Set([
@@ -12,36 +13,68 @@ const SKIP_DIRS = new Set([
   '$windows.~ws',
 ]);
 
+const SKIP_DIRS_FAST = new Set([
+  ...SKIP_DIRS,
+  'node_modules',
+  '.git',
+  'cache',
+  'caches',
+  'temp',
+  'tmp',
+  'windows',
+  'program files',
+  'program files (x86)',
+  'programdata',
+]);
+
 class FileIndexer extends EventEmitter {
-  constructor(indexPath) {
+  constructor(indexDir) {
     super();
-    this.indexPath = indexPath;
+    this.indexDir = indexDir;
+    this.mode = 'fast';
     this.entries = [];
     this.scanning = false;
     this.filesIndexed = 0;
     this._stop = false;
+    this._searchHelper = null;
   }
 
-  async load() {
+  indexPathFor(mode) {
+    return path.join(this.indexDir, `file-index-${mode}.json`);
+  }
+
+  async load(mode = 'fast') {
+    this.mode = mode;
+    this._invalidateSearch();
+    const indexPath = this.indexPathFor(mode);
     try {
-      const raw = await fsp.readFile(this.indexPath, 'utf8');
+      const raw = await fsp.readFile(indexPath, 'utf8');
       const data = JSON.parse(raw);
       if (Array.isArray(data.entries)) {
         this.entries = data.entries;
         this.filesIndexed = this.entries.length;
-        this.emit('ready', { count: this.entries.length, fromCache: true });
-        return;
+        this._buildSearchHelper();
+        return { count: this.entries.length, fromCache: true };
       }
     } catch {
-      // no cache yet
+      // no cache
     }
     this.entries = [];
+    this.filesIndexed = 0;
+    return { count: 0, fromCache: false };
   }
 
   async save() {
-    await fsp.mkdir(path.dirname(this.indexPath), { recursive: true });
-    const payload = JSON.stringify({ version: 1, savedAt: Date.now(), entries: this.entries });
-    await fsp.writeFile(this.indexPath, payload);
+    const indexPath = this.indexPathFor(this.mode);
+    await fsp.mkdir(path.dirname(indexPath), { recursive: true });
+    const payload = JSON.stringify({
+      version: 2,
+      mode: this.mode,
+      savedAt: Date.now(),
+      entries: this.entries,
+    });
+    await fsp.writeFile(indexPath, payload);
+    this._buildSearchHelper();
   }
 
   getDrives() {
@@ -58,22 +91,53 @@ class FileIndexer extends EventEmitter {
     return drives;
   }
 
+  getFastRoots() {
+    const home = os.homedir();
+    const deep = [
+      path.join(home, 'Desktop'),
+      path.join(home, 'Documents'),
+      path.join(home, 'Downloads'),
+      path.join(home, 'Pictures'),
+      path.join(home, 'Videos'),
+      path.join(home, 'Music'),
+      path.join(home, 'OneDrive'),
+      path.join(home, 'Projects'),
+      home,
+    ].filter((p) => {
+      try {
+        return fs.existsSync(p);
+      } catch {
+        return false;
+      }
+    });
+
+    const shallow = this.getDrives().map((d) => ({ root: d, maxDepth: 1 }));
+    return { deep, shallow };
+  }
+
   makeEntry(fullPath, name, isDir) {
     const lname = name.toLowerCase();
     const lpath = fullPath.toLowerCase();
     return { path: fullPath, name, lname, lpath, isDir };
   }
 
-  async walk(root) {
-    const stack = [root];
-    const batch = [];
-    const BATCH = 4000;
+  shouldSkipDir(name, fast) {
+    const lower = name.toLowerCase();
+    if (fast && SKIP_DIRS_FAST.has(lower)) return true;
+    if (SKIP_DIRS.has(lower)) return true;
+    return false;
+  }
+
+  async walk(root, maxDepth = null, fast = false) {
+    const stack = [{ dir: root, depth: 0 }];
+    let batch = 0;
+    const BATCH = 3000;
 
     while (stack.length && !this._stop) {
-      const current = stack.pop();
+      const { dir, depth } = stack.pop();
       let entries;
       try {
-        entries = await fsp.readdir(current, { withFileTypes: true });
+        entries = await fsp.readdir(dir, { withFileTypes: true });
       } catch {
         continue;
       }
@@ -81,54 +145,86 @@ class FileIndexer extends EventEmitter {
       for (const dirent of entries) {
         if (this._stop) return;
         const name = dirent.name;
-        const full = path.join(current, name);
+        const full = path.join(dir, name);
         const isDir = dirent.isDirectory();
 
         this.entries.push(this.makeEntry(full, name, isDir));
         this.filesIndexed += 1;
-        batch.push(full);
+        batch += 1;
 
-        if (isDir) {
-          if (!SKIP_DIRS.has(name.toLowerCase())) stack.push(full);
+        if (isDir && (maxDepth === null || depth < maxDepth)) {
+          if (!this.shouldSkipDir(name, fast)) {
+            stack.push({ dir: full, depth: depth + 1 });
+          }
         }
 
-        if (batch.length >= BATCH) {
-          this.emit('progress', { count: this.filesIndexed });
-          batch.length = 0;
+        if (batch >= BATCH) {
+          this.emit('progress', { count: this.filesIndexed, mode: this.mode });
+          batch = 0;
           await new Promise((r) => setImmediate(r));
         }
       }
     }
   }
 
-  async startScan() {
+  async startScan(mode = this.mode) {
     if (this.scanning) return;
+    this.mode = mode;
     this.scanning = true;
     this._stop = false;
     this.filesIndexed = 0;
     this.entries = [];
+    this._invalidateSearch();
 
-    const drives = this.getDrives();
-    this.emit('scan-start', { drives });
+    this.emit('scan-start', { mode });
 
-    for (const drive of drives) {
-      if (this._stop) break;
-      this.emit('drive', { drive });
-      await this.walk(drive);
+    if (mode === 'full') {
+      for (const drive of this.getDrives()) {
+        if (this._stop) break;
+        this.emit('drive', { drive, mode });
+        await this.walk(drive, null, false);
+      }
+    } else {
+      const { deep, shallow } = this.getFastRoots();
+      for (const root of deep) {
+        if (this._stop) break;
+        this.emit('drive', { drive: root, mode });
+        await this.walk(root, null, true);
+      }
+      for (const { root, maxDepth } of shallow) {
+        if (this._stop) break;
+        this.emit('drive', { drive: root, mode });
+        await this.walk(root, maxDepth, true);
+      }
     }
 
     this.scanning = false;
     await this.save();
-    this.emit('ready', { count: this.entries.length, fromCache: false });
+    this.emit('ready', { count: this.entries.length, fromCache: false, mode: this.mode });
   }
 
   stopScan() {
     this._stop = true;
   }
 
+  _invalidateSearch() {
+    this._searchHelper = null;
+  }
+
+  _buildSearchHelper() {
+    const buckets = new Map();
+    for (let i = 0; i < this.entries.length; i += 1) {
+      const c = this.entries[i].lname[0];
+      if (!c) continue;
+      if (!buckets.has(c)) buckets.set(c, []);
+      buckets.get(c).push(i);
+    }
+    this._searchHelper = { buckets, length: this.entries.length };
+  }
+
   search(query, limit) {
     const { searchIndex } = require('./search.cjs');
-    return searchIndex(this.entries, query, limit);
+    return searchIndex(this.entries, query, limit, this._searchHelper);
   }
 }
 
