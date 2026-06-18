@@ -8,14 +8,14 @@ Ultra-fast Windows file search. Press **Ctrl+Space** anywhere to open the floati
 - **Draggable** — grab the top bar to move the search window anywhere; position is remembered
 - **Fast index (default)** — indexes your profile folders (Desktop, Documents, Downloads, etc.) in seconds
 - **Full index (optional)** — deep scan of all drives when you need to find absolutely everything
-- **Fuzzy / near-match search** — typo-tolerant matching with optimized bucket lookup
+- **Apps & games first** — `.exe` files rank at the top with real Windows icons; type a game name and hit Enter to launch
 - **Windows shell actions** — Open, Open file location, Properties, Send to Desktop, Copy path, Copy, Delete
 - **Pin mode** — keep the search bar open while you click elsewhere
 - **System tray** — runs in the background; double-click tray icon to search
 
 ## Install
 
-Download **RushSearch-Setup-1.1.0.exe** from [Releases](https://github.com/brivera2005/RushSearch/releases).
+Download **RushSearch-Setup-1.2.0.exe** from [Releases](https://github.com/brivera2005/RushSearch/releases).
 
 ## Use
 

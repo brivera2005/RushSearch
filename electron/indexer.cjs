@@ -22,8 +22,6 @@ const SKIP_DIRS_FAST = new Set([
   'temp',
   'tmp',
   'windows',
-  'program files',
-  'program files (x86)',
   'programdata',
 ]);
 
@@ -51,7 +49,10 @@ class FileIndexer extends EventEmitter {
       const raw = await fsp.readFile(indexPath, 'utf8');
       const data = JSON.parse(raw);
       if (Array.isArray(data.entries)) {
-        this.entries = data.entries;
+        this.entries = data.entries.map((e) => ({
+          ...e,
+          isExe: e.isExe ?? (!e.isDir && e.lname?.endsWith('.exe')),
+        }));
         this.filesIndexed = this.entries.length;
         this._buildSearchHelper();
         return { count: this.entries.length, fromCache: true };
@@ -68,7 +69,7 @@ class FileIndexer extends EventEmitter {
     const indexPath = this.indexPathFor(this.mode);
     await fsp.mkdir(path.dirname(indexPath), { recursive: true });
     const payload = JSON.stringify({
-      version: 2,
+      version: 3,
       mode: this.mode,
       savedAt: Date.now(),
       entries: this.entries,
@@ -91,6 +92,14 @@ class FileIndexer extends EventEmitter {
     return drives;
   }
 
+  exists(p) {
+    try {
+      return fs.existsSync(p);
+    } catch {
+      return false;
+    }
+  }
+
   getFastRoots() {
     const home = os.homedir();
     const deep = [
@@ -103,32 +112,50 @@ class FileIndexer extends EventEmitter {
       path.join(home, 'OneDrive'),
       path.join(home, 'Projects'),
       home,
-    ].filter((p) => {
-      try {
-        return fs.existsSync(p);
-      } catch {
-        return false;
-      }
-    });
+    ].filter((p) => this.exists(p));
 
-    const shallow = this.getDrives().map((d) => ({ root: d, maxDepth: 1 }));
+    const shallow = this.getDrives().map((d) => ({ root: d, maxDepth: 1, gameScan: false }));
     return { deep, shallow };
+  }
+
+  getGameRoots() {
+    const candidates = [
+      'C:\\Program Files',
+      'C:\\Program Files (x86)',
+      'C:\\Program Files\\Epic Games',
+      'C:\\Program Files (x86)\\Steam\\steamapps\\common',
+      'C:\\Program Files\\Steam\\steamapps\\common',
+      path.join(os.homedir(), 'AppData', 'Local', 'Programs'),
+      path.join(os.homedir(), 'AppData', 'Roaming', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+    ];
+
+    const roots = [];
+    for (const root of candidates) {
+      if (!this.exists(root)) continue;
+      const depth = /steamapps\\common|epic games/i.test(root) ? 2 : 3;
+      roots.push({ root, maxDepth: depth, gameScan: true });
+    }
+    return roots;
   }
 
   makeEntry(fullPath, name, isDir) {
     const lname = name.toLowerCase();
     const lpath = fullPath.toLowerCase();
-    return { path: fullPath, name, lname, lpath, isDir };
+    const isExe = !isDir && lname.endsWith('.exe');
+    return { path: fullPath, name, lname, lpath, isDir, isExe };
   }
 
-  shouldSkipDir(name, fast) {
+  shouldSkipDir(name, fast, gameScan) {
     const lower = name.toLowerCase();
-    if (fast && SKIP_DIRS_FAST.has(lower)) return true;
     if (SKIP_DIRS.has(lower)) return true;
+    if (gameScan) {
+      return ['node_modules', '.git', 'cache', 'caches'].includes(lower);
+    }
+    if (fast && SKIP_DIRS_FAST.has(lower)) return true;
     return false;
   }
 
-  async walk(root, maxDepth = null, fast = false) {
+  async walk(root, maxDepth = null, fast = false, gameScan = false) {
     const stack = [{ dir: root, depth: 0 }];
     let batch = 0;
     const BATCH = 3000;
@@ -153,7 +180,7 @@ class FileIndexer extends EventEmitter {
         batch += 1;
 
         if (isDir && (maxDepth === null || depth < maxDepth)) {
-          if (!this.shouldSkipDir(name, fast)) {
+          if (!this.shouldSkipDir(name, fast, gameScan)) {
             stack.push({ dir: full, depth: depth + 1 });
           }
         }
@@ -182,19 +209,24 @@ class FileIndexer extends EventEmitter {
       for (const drive of this.getDrives()) {
         if (this._stop) break;
         this.emit('drive', { drive, mode });
-        await this.walk(drive, null, false);
+        await this.walk(drive, null, false, false);
       }
     } else {
       const { deep, shallow } = this.getFastRoots();
       for (const root of deep) {
         if (this._stop) break;
         this.emit('drive', { drive: root, mode });
-        await this.walk(root, null, true);
+        await this.walk(root, null, true, false);
       }
       for (const { root, maxDepth } of shallow) {
         if (this._stop) break;
         this.emit('drive', { drive: root, mode });
-        await this.walk(root, maxDepth, true);
+        await this.walk(root, maxDepth, true, false);
+      }
+      for (const { root, maxDepth } of this.getGameRoots()) {
+        if (this._stop) break;
+        this.emit('drive', { drive: root, mode });
+        await this.walk(root, maxDepth, true, true);
       }
     }
 
@@ -213,13 +245,23 @@ class FileIndexer extends EventEmitter {
 
   _buildSearchHelper() {
     const buckets = new Map();
+    const exeBuckets = new Map();
     for (let i = 0; i < this.entries.length; i += 1) {
-      const c = this.entries[i].lname[0];
+      const entry = this.entries[i];
+      const c = entry.lname[0];
       if (!c) continue;
       if (!buckets.has(c)) buckets.set(c, []);
       buckets.get(c).push(i);
+      if (entry.isExe) {
+        const stem = entry.lname.endsWith('.exe') ? entry.lname.slice(0, -4) : entry.lname;
+        const sc = stem[0];
+        if (sc) {
+          if (!exeBuckets.has(sc)) exeBuckets.set(sc, []);
+          exeBuckets.get(sc).push(i);
+        }
+      }
     }
-    this._searchHelper = { buckets, length: this.entries.length };
+    this._searchHelper = { buckets, exeBuckets, length: this.entries.length };
   }
 
   search(query, limit) {

@@ -44,9 +44,58 @@ function fuzzyScore(query, target) {
   return score;
 }
 
+function baseName(lname) {
+  const dot = lname.lastIndexOf('.');
+  return dot > 0 ? lname.slice(0, dot) : lname;
+}
+
+const LOW_PRIO_EXT = new Set([
+  '.dll', '.log', '.tmp', '.cache', '.json', '.xml', '.pak', '.sig',
+  '.md', '.txt', '.ini', '.cfg', '.dat', '.bin', '.manifest', '.pdb',
+]);
+
+const NOISE_EXE = /uninstall|setup|installer|update|crash|redist|helper|support|diag/i;
+
+function isExeEntry(entry) {
+  return entry.isExe || (!entry.isDir && entry.lname.endsWith('.exe'));
+}
+
+function launchBoost(query, entry) {
+  let boost = 0;
+  const tokens = query.split(/\s+/).filter(Boolean);
+  const stem = baseName(entry.lname);
+
+  if (isExeEntry(entry)) {
+    boost += 150;
+    for (const token of tokens) {
+      if (stem === token) boost += 250;
+      else if (stem.startsWith(token)) boost += 100;
+      else if (stem.includes(token)) boost += 50;
+    }
+    if (NOISE_EXE.test(entry.lname)) boost -= 80;
+    const depth = (entry.path.match(/\\/g) || []).length;
+    boost += Math.max(0, 30 - depth);
+    if (/steamapps|epic games|program files|games|riot games|battle\.net|ubisoft/i.test(entry.lpath)) {
+      boost += 40;
+    }
+  } else if (entry.isDir) {
+    boost -= 20;
+    for (const token of tokens) {
+      if (entry.lname === token || entry.lname.startsWith(token)) boost += 15;
+    }
+  } else {
+    boost -= 25;
+    const dot = entry.lname.lastIndexOf('.');
+    const ext = dot >= 0 ? entry.lname.slice(dot) : '';
+    if (LOW_PRIO_EXT.has(ext)) boost -= 50;
+  }
+
+  return boost;
+}
+
 function tokenScore(query, entry) {
   const tokens = query.split(/\s+/).filter(Boolean);
-  if (!tokens.length) return 0;
+  if (!tokens.length) return -1;
 
   let total = 0;
   for (const token of tokens) {
@@ -62,7 +111,8 @@ function tokenScore(query, entry) {
     if (best < 0) return -1;
     total += best;
   }
-  return total + (entry.isDir ? 2 : 0);
+
+  return total + launchBoost(query, entry);
 }
 
 function candidateIndices(entries, query, helper) {
@@ -70,15 +120,15 @@ function candidateIndices(entries, query, helper) {
   const tokens = query.split(/\s+/).filter(Boolean);
   if (!tokens.length) return null;
 
-  const first = tokens[0][0];
-  const bucket = helper.buckets.get(first);
-  if (bucket && bucket.length < entries.length * 0.85) return bucket;
-
   const set = new Set();
   for (const token of tokens) {
     const c = token[0];
     const b = helper.buckets.get(c);
     if (b) b.forEach((i) => set.add(i));
+    if (helper.exeBuckets) {
+      const eb = helper.exeBuckets.get(c);
+      if (eb) eb.forEach((i) => set.add(i));
+    }
   }
   if (set.size > 0 && set.size < entries.length) return [...set];
   return null;
@@ -108,6 +158,7 @@ function searchIndex(index, query, limit = 80, helper = null) {
     path: r.entry.path,
     name: r.entry.name,
     isDir: r.entry.isDir,
+    isExe: isExeEntry(r.entry),
     score: r.score,
   }));
 }

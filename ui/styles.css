@@ -155,7 +155,33 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.file-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.file-icon-fallback {
   font-size: 14px;
+  line-height: 1;
+}
+
+.file-icon-fallback.exe {
+  color: #7dffb3;
+  font-size: 11px;
+}
+
+.meta {
+  min-width: 0;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .result .name {
@@ -164,6 +190,19 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.app-tag {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(125, 255, 179, 0.15);
+  color: #7dffb3;
 }
 
 .result .path {

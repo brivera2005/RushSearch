@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('rushSearch', {
   search: (query) => ipcRenderer.invoke('search', query),
+  getIcons: (paths) => ipcRenderer.invoke('get-icons', paths),
   shellAction: (action, filePath, extra) => ipcRenderer.invoke('shell-action', action, filePath, extra),
   hide: () => ipcRenderer.invoke('hide'),
   indexStatus: () => ipcRenderer.invoke('index-status'),

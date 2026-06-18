@@ -19,6 +19,8 @@ let searchWindow = null;
 let tray = null;
 let indexer = null;
 let settings = null;
+const iconCache = new Map();
+const ICON_CACHE_MAX = 600;
 
 const WINDOW_W = 720;
 const WINDOW_H = 520;
@@ -217,10 +219,37 @@ function setupIndexer() {
   });
 }
 
+async function getIconDataUrl(filePath) {
+  if (iconCache.has(filePath)) return iconCache.get(filePath);
+  try {
+    const img = await app.getFileIcon(filePath, { size: 'small' });
+    const url = img.isEmpty() ? null : img.toDataURL();
+    iconCache.set(filePath, url);
+    if (iconCache.size > ICON_CACHE_MAX) {
+      iconCache.delete(iconCache.keys().next().value);
+    }
+    return url;
+  } catch {
+    iconCache.set(filePath, null);
+    return null;
+  }
+}
+
 function setupIpc() {
   ipcMain.handle('search', (_e, query) => {
     if (!indexer) return [];
     return indexer.search(query, 80);
+  });
+
+  ipcMain.handle('get-icons', async (_e, paths) => {
+    const out = {};
+    const unique = [...new Set((paths || []).slice(0, 40))];
+    await Promise.all(
+      unique.map(async (p) => {
+        out[p] = await getIconDataUrl(p);
+      })
+    );
+    return out;
   });
 
   ipcMain.handle('shell-action', async (_e, action, filePath, extra) => {

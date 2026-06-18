@@ -15,6 +15,7 @@ let results = [];
 let selected = 0;
 let searchTimer = null;
 let appSettings = { indexMode: 'fast', pinWindow: false };
+const iconMap = new Map();
 
 const MENU_ITEMS = [
   { action: 'open', label: 'Open' },
@@ -45,8 +46,14 @@ function setStatus(data) {
   if (data.mode) applySettings({ indexMode: data.mode, pinWindow: data.pinWindow });
 }
 
-function iconFor(item) {
-  return item.isDir ? '📁' : '📄';
+function iconHtml(item) {
+  const cached = iconMap.get(item.path);
+  if (cached) {
+    return `<img class="file-icon" src="${cached}" alt="" />`;
+  }
+  if (item.isExe) return '<span class="file-icon-fallback exe">▶</span>';
+  if (item.isDir) return '<span class="file-icon-fallback">📁</span>';
+  return '<span class="file-icon-fallback">📄</span>';
 }
 
 function render() {
@@ -67,9 +74,12 @@ function render() {
     const li = document.createElement('li');
     li.className = `result${i === selected ? ' active' : ''}`;
     li.innerHTML = `
-      <div class="icon">${iconFor(item)}</div>
-      <div>
-        <div class="name">${escapeHtml(item.name)}</div>
+      <div class="icon">${iconHtml(item)}</div>
+      <div class="meta">
+        <div class="name-row">
+          <span class="name">${escapeHtml(item.name)}</span>
+          ${item.isExe ? '<span class="app-tag">App</span>' : ''}
+        </div>
         <div class="path">${escapeHtml(item.path)}</div>
       </div>
     `;
@@ -110,6 +120,12 @@ function scheduleSearch() {
     }
     results = await window.rushSearch.search(q);
     selected = 0;
+    render();
+    const paths = results.slice(0, 30).map((r) => r.path);
+    const icons = await window.rushSearch.getIcons(paths);
+    for (const [p, url] of Object.entries(icons)) {
+      if (url) iconMap.set(p, url);
+    }
     render();
   }, 30);
 }
