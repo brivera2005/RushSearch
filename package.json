@@ -1,0 +1,53 @@
+{
+  "name": "rushsearch",
+  "version": "1.0.0",
+  "description": "RushSearch — ultra-fast Windows file search with Ctrl+Space",
+  "author": "brivera2005",
+  "license": "MIT",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "generate-icon": "node scripts/generate-icon.mjs",
+    "build": "npm run generate-icon && electron-builder --win",
+    "build:dir": "npm run generate-icon && electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "com.rushsearch.app",
+    "productName": "RushSearch",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "ui/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "RushSearch",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "artifactName": "RushSearch-Setup-${version}.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8",
+    "png-to-ico": "^2.1.8",
+    "pngjs": "^7.0.0"
+  }
+}
